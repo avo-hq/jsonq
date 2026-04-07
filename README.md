@@ -1,3 +1,5 @@
+<img src="jsonq-logo.jpeg" alt="jsonq logo" width="200" />
+
 # jsonq
 
 [![Testing](https://github.com/avo-hq/jsonq/actions/workflows/testing.yml/badge.svg)](https://github.com/avo-hq/jsonq/actions/workflows/testing.yml)
