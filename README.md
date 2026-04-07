@@ -1,5 +1,7 @@
 # jsonq
 
+[![Testing](https://github.com/avo-hq/jsonq/actions/workflows/testing.yml/badge.svg)](https://github.com/avo-hq/jsonq/actions/workflows/testing.yml)
+
 Friendly JSON column queries for ActiveRecord. Use `where` with JSON attributes just like regular columns.
 
 Supports PostgreSQL, MySQL, and SQLite.
