@@ -1,0 +1,127 @@
+#!/usr/bin/env ruby
+
+require_relative "../lib/jsonq/version"
+require "bundler/gem_tasks"
+require "pathname"
+
+class Release
+  BUMP_TYPES = %w[major minor patch].freeze
+
+  def initialize(bump:, dry: false)
+    @current = Gem::Version.new(Jsonq::VERSION)
+    @bump = bump
+    @dry = dry
+    @version = compute_next_version
+  end
+
+  def perform
+    puts "== Current version: #{current} =="
+    puts "== Releasing: #{version} (#{bump}) =="
+    puts
+
+    write_version
+    update_copyright
+    bundle
+    commit
+    build_and_push_gem
+    cleanup
+
+    puts "== Done! #{version} released =="
+  end
+
+  private
+    attr_reader :current, :version, :bump, :dry
+
+    def dry?
+      dry
+    end
+
+    def compute_next_version
+      major, minor, patch = current.segments
+
+      case bump
+      when "major" then "#{major + 1}.0.0"
+      when "minor" then "#{major}.#{minor + 1}.0"
+      when "patch" then "#{major}.#{minor}.#{patch + 1}"
+      end
+    end
+
+    def write_version
+      puts "== Writing version =="
+
+      write_version_to_rb
+      write_version_to_gemfile_lock
+    end
+
+    def write_version_to_rb
+      Pathname.new("./lib/jsonq/version.rb").write <<~RUBY
+        # frozen_string_literal: true
+
+        module Jsonq
+          VERSION = "#{version}"
+        end
+      RUBY
+    end
+
+    def write_version_to_gemfile_lock
+      pathname = Pathname.new "./Gemfile.lock"
+      return unless pathname.exist?
+
+      data = pathname.read
+      data.sub!(/jsonq \(\d+\.\d+\.\d+\)/, "jsonq (#{version})")
+      pathname.write data
+    end
+
+    def update_copyright
+      puts "== Updating license year =="
+
+      pathname = Pathname.new "LICENSE"
+      data = pathname.read
+      data.sub!(/Copyright \(c\) \d{4}/, "Copyright (c) #{Time.now.year}")
+      pathname.write data
+    end
+
+    def bundle
+      puts "== Bundling =="
+      abort "❌ Failed to bundle" unless system "bundle"
+    end
+
+    def commit
+      if dry?
+        puts "== Tracking changes (dry run, skipping commit) =="
+      else
+        puts "== Committing changes =="
+      end
+
+      abort("❌ Failed to commit") unless \
+        system("git add .") &&
+        (dry? ? true : system("git commit -m 'Bump version for #{version}'")) &&
+        (dry? ? true : system("git push"))
+    end
+
+    def build_and_push_gem
+      unless dry?
+        puts "== Building and pushing gem =="
+
+        abort "❌ Failed to release gem" unless system "bundle exec rake release"
+      end
+    end
+
+    def cleanup
+      puts "== Cleaning up =="
+      system "rm -rf pkg"
+    end
+end
+
+# Parse flags
+flags = ARGV.select { |a| a.start_with?("--") }.map { |a| a.delete_prefix("--") }
+
+if flags.include?("version") || flags.include?("v")
+  puts Jsonq::VERSION
+  exit
+end
+
+dry = flags.include?("dry")
+bump = (flags & Release::BUMP_TYPES).first || "minor"
+
+Release.new(bump: bump, dry: dry).perform
