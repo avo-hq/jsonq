@@ -122,6 +122,6 @@ if flags.include?("version") || flags.include?("v")
 end
 
 dry = flags.include?("dry")
-bump = (flags & Release::BUMP_TYPES).first || "minor"
+bump = (flags & Release::BUMP_TYPES).first || "patch"
 
 Release.new(bump: bump, dry: dry).perform
