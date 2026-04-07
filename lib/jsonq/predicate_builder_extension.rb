@@ -5,7 +5,11 @@ module Jsonq
     protected
 
     def expand_from_hash(attributes, &block)
-      klass = @table.send(:klass) rescue nil
+      klass = begin
+        @table.send(:klass)
+      rescue
+        nil
+      end
 
       return super unless klass&.respond_to?(:jsonq_registry) && klass.jsonq_registry.present?
 
@@ -24,11 +28,19 @@ module Jsonq
 
           predicate = case value
           when Array
-            path_expr.in(value.map(&:to_s))
+            # Wrap with AND IS NOT NULL so NOT(IN(...) AND IS NOT NULL)
+            # becomes NOT IN(...) OR IS NULL — includes missing keys
+            Arel::Nodes::Grouping.new(
+              path_expr.in(value.map(&:to_s)).and(path_expr.not_eq(nil))
+            )
           when nil
             path_expr.eq(nil)
           else
-            path_expr.eq(value.to_s)
+            # Wrap with AND IS NOT NULL so NOT(= val AND IS NOT NULL)
+            # becomes != val OR IS NULL — includes missing keys
+            Arel::Nodes::Grouping.new(
+              path_expr.eq(value.to_s).and(path_expr.not_eq(nil))
+            )
           end
 
           jsonq_predicates << predicate

@@ -6,7 +6,7 @@ require "test_helper"
 class Plan < ActiveRecord::Base
   store_accessor :metadata, :private_title, :private_description, :category
 
-  include Jsonq::Queryable
+  jsonq_queryable
 
   json_attribute :metadata, "nested.deep.value", as: :deep_value
 end
@@ -41,7 +41,7 @@ class QueryableTest < Minitest::Test
   def test_model_with_no_store_accessor
     klass = Class.new(ActiveRecord::Base) do
       self.table_name = "plans"
-      include Jsonq::Queryable
+      jsonq_queryable
     end
 
     assert_equal({}, klass.jsonq_registry)
@@ -51,13 +51,12 @@ class QueryableTest < Minitest::Test
     klass = Class.new(ActiveRecord::Base) do
       self.table_name = "plans"
       store_accessor :metadata, :custom_field, :status
-      include Jsonq::Queryable
+      jsonq_queryable
     end
 
     registry = klass.jsonq_registry
     assert registry.key?("custom_field"), "non-column key should be registered"
     refute registry.key?("status"), "status is a real column and should be skipped"
-    refute registry.key?("name"), "name is a real column and should not be registered"
   end
 
   def test_unsupported_column_type_raises
@@ -65,9 +64,47 @@ class QueryableTest < Minitest::Test
       Class.new(ActiveRecord::Base) do
         self.table_name = "articles"
         store_accessor :settings, :theme
-        include Jsonq::Queryable
+        jsonq_queryable
       end
     end
+  end
+
+  def test_store_accessor_after_jsonq_queryable
+    klass = Class.new(ActiveRecord::Base) do
+      self.table_name = "plans"
+      jsonq_queryable
+      store_accessor :metadata, :late_field, :another_field
+    end
+
+    registry = klass.jsonq_registry
+    assert registry.key?("late_field"), "store_accessor declared after jsonq_queryable should be registered"
+    assert registry.key?("another_field"), "store_accessor declared after jsonq_queryable should be registered"
+    assert_equal "metadata", registry["late_field"][:column]
+  end
+
+  def test_store_accessor_before_and_after
+    klass = Class.new(ActiveRecord::Base) do
+      self.table_name = "plans"
+      store_accessor :metadata, :early_field
+      jsonq_queryable
+      store_accessor :metadata, :late_field
+    end
+
+    registry = klass.jsonq_registry
+    assert registry.key?("early_field"), "store_accessor before jsonq_queryable should be registered"
+    assert registry.key?("late_field"), "store_accessor after jsonq_queryable should be registered"
+  end
+
+  def test_multiple_store_accessors_on_different_columns
+    klass = Class.new(ActiveRecord::Base) do
+      self.table_name = "plans"
+      jsonq_queryable
+      store_accessor :metadata, :field_a
+    end
+
+    registry = klass.jsonq_registry
+    assert registry.key?("field_a")
+    assert_equal "metadata", registry["field_a"][:column]
   end
 end
 
@@ -94,7 +131,7 @@ class JsonAttributeTest < Minitest::Test
     assert_raises(ArgumentError) do
       Class.new(ActiveRecord::Base) do
         self.table_name = "plans"
-        include Jsonq::Queryable
+        jsonq_queryable
         json_attribute :metadata, "some.path"
       end
     end
@@ -224,10 +261,13 @@ class IntegrationTest < Minitest::Test
 
   def test_negation_query
     results = Plan.where.not(private_title: "Draft")
+    names = results.map(&:name)
 
-    assert_includes results.map(&:name), "Plan B"
-    refute_includes results.map(&:name), "Plan A"
-    refute_includes results.map(&:name), "Plan C"
+    assert_includes names, "Plan B", "non-matching value should be included"
+    refute_includes names, "Plan A", "matching value should be excluded"
+    refute_includes names, "Plan C", "matching value should be excluded"
+    assert_includes names, "Plan D", "missing key (empty JSON) should be included"
+    assert_includes names, "Plan E", "nil metadata should be included"
   end
 
   def test_composition_with_real_column

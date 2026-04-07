@@ -13,5 +13,6 @@ module Jsonq
 
   def self.setup!
     ActiveRecord::PredicateBuilder.prepend(Jsonq::PredicateBuilderExtension)
+    ActiveRecord::Base.extend(Jsonq::QueryableDsl)
   end
 end

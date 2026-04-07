@@ -16,15 +16,17 @@ gem "jsonq"
 
 ## Getting Started
 
-Include `Jsonq::Queryable` in your model:
+Add `jsonq_queryable` to your model:
 
 ```ruby
 class Plan < ApplicationRecord
-  store_accessor :metadata, :private_title, :category, :author
+  jsonq_queryable
 
-  include Jsonq::Queryable
+  store_accessor :metadata, :private_title, :category, :author
 end
 ```
+
+Order doesn't matter — `jsonq_queryable` can go before or after `store_accessor`.
 
 Now query JSON attributes with `where`:
 
@@ -59,13 +61,13 @@ WHERE "plans"."metadata"->>'$.private_title' = 'Draft'
 
 ## store_accessor Integration
 
-Any `store_accessor` attributes on a native JSON/JSONB column are automatically registered when you include `Jsonq::Queryable`. No extra configuration needed.
+Any `store_accessor` attributes on a native JSON/JSONB column are automatically registered. Declarations before or after `jsonq_queryable` both work.
 
 ```ruby
 class Plan < ApplicationRecord
-  store_accessor :metadata, :private_title, :category
+  jsonq_queryable
 
-  include Jsonq::Queryable
+  store_accessor :metadata, :private_title, :category
 end
 
 Plan.where(private_title: "Draft")
@@ -81,7 +83,7 @@ For nested JSON paths or attributes without `store_accessor`, use `json_attribut
 
 ```ruby
 class Event < ApplicationRecord
-  include Jsonq::Queryable
+  jsonq_queryable
 
   json_attribute :metadata, "address.billing.city", as: :billing_city
   json_attribute :metadata, "organizer.name", as: :organizer_name
@@ -95,14 +97,14 @@ The `as:` option is required.
 
 ## Query Support
 
-| Operation | Example |
-|-----------|---------|
-| Equality | `where(key: "value")` |
-| Nil/NULL | `where(key: nil)` |
-| IN (array) | `where(key: ["a", "b"])` |
-| Negation | `where.not(key: "value")` |
+| Operation   | Example                                  |
+| ----------- | ---------------------------------------- |
+| Equality    | `where(key: "value")`                    |
+| Nil/NULL    | `where(key: nil)`                        |
+| IN (array)  | `where(key: ["a", "b"])`                 |
+| Negation    | `where.not(key: "value")`                |
 | Composition | `where(json_key: "x", real_column: "y")` |
-| Chaining | `where(key: "x").where(other_key: "y")` |
+| Chaining    | `where(key: "x").where(other_key: "y")`  |
 
 ## Database Support
 

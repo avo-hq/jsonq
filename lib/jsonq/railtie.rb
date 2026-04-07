@@ -6,8 +6,8 @@ module Jsonq
   class Railtie < ::Rails::Railtie
     initializer "jsonq.active_record" do
       ActiveSupport.on_load :active_record do
-        require "jsonq/predicate_builder_extension"
         ActiveRecord::PredicateBuilder.prepend(Jsonq::PredicateBuilderExtension)
+        ActiveRecord::Base.extend(Jsonq::QueryableDsl)
       end
     end
   end
